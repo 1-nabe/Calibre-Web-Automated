@@ -523,13 +523,17 @@
                   {{ _('Title') }}
                 </label>
 
-                <input
-                  type="text"
+                <textarea
                   class="form-control"
                   id="placeholder-title"
-                  name="title"
-                  placeholder="{{ _('Book title') }}"
-                  required>
+                  name="titles"
+                  rows="8"
+                  placeholder="{{ _('One book title per line') }}"
+                  required></textarea>
+
+                <p class="help-block">
+                  {{ _('Enter one book title per line.') }}
+                </p>
               </div>
             </div>
 

@@ -95,42 +95,65 @@ def edit_book(book_id):
 @login_required_if_no_ano
 @upload_required
 def add_placeholder():
-    title = request.form.get("title", "").strip()
+    raw_titles = request.form.get("titles", "")
 
-    if not title:
-        flash(_("Book title is required"), category="error")
+    titles = [
+        title.strip()
+        for title in raw_titles.splitlines()
+        if title.strip()
+    ]
+
+    if not titles:
+        flash(_("At least one book title is required"), category="error")
         return redirect(url_for("web.index"))
 
-    try:
-        result = subprocess.run(
-            [
-                "calibredb",
-                "add",
-                "--empty",
-                "--title",
+    created = []
+    failed = []
+
+    for title in titles:
+        try:
+            result = subprocess.run(
+                [
+                    "calibredb",
+                    "add",
+                    "--empty",
+                    "--title",
+                    title,
+                    "--library-path=/calibre-library",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+            created.append(title)
+
+            log.info(
+                "Placeholder book created: title=%s output=%s",
                 title,
-                "--library-path=/calibre-library",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
+                result.stdout.strip()
+            )
+
+        except subprocess.CalledProcessError as e:
+            failed.append(title)
+
+            log.error_or_exception(
+                "Failed to create placeholder book '%s': %s",
+                title,
+                e.stderr
+            )
+
+    if created:
+        flash(
+            _("%(count)s placeholder book(s) added", count=len(created)),
+            category="success"
         )
 
-        log.info(
-            "Placeholder book created: title=%s output=%s",
-            title,
-            result.stdout.strip()
+    if failed:
+        flash(
+            _("%(count)s placeholder book(s) could not be added", count=len(failed)),
+            category="error"
         )
-
-        flash(_("Placeholder book added"), category="success")
-
-    except subprocess.CalledProcessError as e:
-        log.error_or_exception(
-            "Failed to create placeholder book '%s': %s",
-            title,
-            e.stderr
-        )
-        flash(_("Failed to create placeholder book"), category="error")
 
     return redirect(url_for("web.index"))
 
