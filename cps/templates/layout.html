@@ -159,16 +159,14 @@
                     </form>
                   </li>
                   <li>
-                    <div class="navbar-form">
-                      <button
-                        type="button"
-                        class="btn btn-default"
-                        data-toggle="modal"
-                        data-target="#placeholderModal"
-                        title="{{ _('Add empty book') }}">
-                        <span class="glyphicon glyphicon-plus"></span>
-                      </button>
-                    </div>
+                    <a
+                      id="add-placeholder"
+                      href="#"
+                      data-target="#placeholderModal"
+                      title="{{ _('Add placeholder book') }}"
+                      data-placement="bottom">
+                      <span class="glyphicon glyphicon-plus"></span>
+                    </a>
                   </li>
               {% endif %}
               {% if not current_user.is_anonymous and not simple%}
@@ -561,6 +559,15 @@
     </div>
     {% endif %}
     <script>
+      $('#add-placeholder').tooltip({
+        placement: 'bottom'
+      });
+
+      $('#add-placeholder').on('click', function (e) {
+        e.preventDefault();
+        $('#placeholderModal').modal('show');
+      });
+
       $('#placeholderModal').on('shown.bs.modal', function () {
         $('#placeholder-title').focus();
       });
