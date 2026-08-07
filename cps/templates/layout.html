@@ -164,9 +164,9 @@
                         type="button"
                         class="btn btn-default"
                         data-toggle="modal"
-                        data-target="#placeholderModal">
+                        data-target="#placeholderModal"
+                        title="{{ _('Add empty book') }}">
                         <span class="glyphicon glyphicon-plus"></span>
-                        {{ _('Placeholder') }}
                       </button>
                     </div>
                   </li>
@@ -493,6 +493,7 @@
         <div class="modal-content">
 
           <form
+            id="placeholder-form"
             action="{{ url_for('edit-book.add_placeholder') }}"
             method="post">
 
@@ -546,9 +547,11 @@
               </button>
 
               <button
+                id="placeholder-submit"
                 type="submit"
                 class="btn btn-primary">
-                {{ _('Add') }}
+                <span id="placeholder-submit-icon" class="glyphicon glyphicon-plus"></span>
+                <span id="placeholder-submit-text">{{ _('Add') }}</span>
               </button>
             </div>
 
@@ -561,6 +564,34 @@
       $('#placeholderModal').on('shown.bs.modal', function () {
         $('#placeholder-title').focus();
       });
+
+      $('#placeholder-form').on('submit', function () {
+        var $submit = $('#placeholder-submit');
+
+        $submit.prop('disabled', true);
+
+        $('#placeholder-submit-icon')
+          .removeClass('glyphicon-plus')
+          .addClass('glyphicon-refresh placeholder-spin');
+
+        $('#placeholder-submit-text')
+          .text('{{ _("Adding...") }}');
+      });
     </script>
+    <style>
+      .placeholder-spin {
+        animation: placeholder-spin 1s linear infinite;
+      }
+
+      @keyframes placeholder-spin {
+        from {
+          transform: rotate(0deg);
+        }
+
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </body>
 </html>
