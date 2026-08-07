@@ -1,9 +1,6 @@
 name: Build Placeholder Test Image
 
 on:
-  push:
-    branches:
-      - feature/placeholder-books
   workflow_dispatch:
 
 permissions:
