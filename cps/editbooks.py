@@ -38,6 +38,7 @@ from .usermanagement import user_login_required, login_required_if_no_ano
 from .string_helper import strip_whitespaces
 from werkzeug.utils import secure_filename
 import uuid
+import subprocess
 
 editbook = Blueprint('edit-book', __name__)
 log = logger.create()
@@ -88,6 +89,50 @@ def show_edit_book(book_id):
 @edit_required
 def edit_book(book_id):
     return do_edit_book(book_id)
+
+
+@editbook.route("/add-placeholder", methods=["POST"])
+@login_required_if_no_ano
+@upload_required
+def add_placeholder():
+    title = request.form.get("title", "").strip()
+
+    if not title:
+        flash(_("Book title is required"), category="error")
+        return redirect(url_for("web.index"))
+
+    try:
+        result = subprocess.run(
+            [
+                "calibredb",
+                "add",
+                "--empty",
+                "--title",
+                title,
+                "--library-path=/calibre-library",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        log.info(
+            "Placeholder book created: title=%s output=%s",
+            title,
+            result.stdout.strip()
+        )
+
+        flash(_("Placeholder book added"), category="success")
+
+    except subprocess.CalledProcessError as e:
+        log.error_or_exception(
+            "Failed to create placeholder book '%s': %s",
+            title,
+            e.stderr
+        )
+        flash(_("Failed to create placeholder book"), category="error")
+
+    return redirect(url_for("web.index"))
 
 
 @editbook.route("/upload", methods=["POST"])
