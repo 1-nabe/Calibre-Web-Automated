@@ -2,19 +2,19 @@ name: Build & Push - Dev - Split Strategy
 # Automatically builds and pushes a multi-platform dev image based on commits involving key files in any branch
 
 on:
-  push:
-    branches-ignore:
-      - 'main'
-    paths:
-      - 'empty_library/**'
-      - 'cps/**'
-      - 'scripts/**'
-      - '**/Dockerfile'
-      - '**/requirements.txt'
-      - '**/optional-requirements.txt'
-      - '**/compile_translations.sh'
-      - 'koreader/**'
-      - '**/cps.py'
+  #push:
+    #branches-ignore:
+   #   - 'main'
+   # paths:
+   #   - 'empty_library/**'
+   #   - 'cps/**'
+   #   - 'scripts/**'
+    #  - '**/Dockerfile'
+   #   - '**/requirements.txt'
+    #  - '**/optional-requirements.txt'
+    #  - '**/compile_translations.sh'
+    #  - 'koreader/**'
+    #  - '**/cps.py'
   workflow_dispatch:
     inputs:
       ref:
