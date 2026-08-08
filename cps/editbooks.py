@@ -278,8 +278,9 @@ def fetch_isbn_metadata(book_id):
         opf_file.write(opf_data)
         opf_token = os.path.basename(opf_file.name)
 
-    return render_template(
+    return render_title_template(
         "isbn_metadata_preview.html",
+        title=_("ISBN Metadata Preview"),
         book=book,
         metadata=metadata,
         opf_token=opf_token,
