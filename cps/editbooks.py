@@ -39,6 +39,7 @@ from .string_helper import strip_whitespaces
 from werkzeug.utils import secure_filename
 import uuid
 import subprocess
+import tempfile
 import xml.etree.ElementTree as ET
 
 editbook = Blueprint('edit-book', __name__)
