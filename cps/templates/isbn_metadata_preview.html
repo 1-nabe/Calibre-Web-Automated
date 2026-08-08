@@ -1,0 +1,89 @@
+{% extends "layout.html" %}
+
+{% block body %}
+<div class="container-fluid">
+
+  <div class="row">
+    <div class="col-sm-8 col-sm-offset-2">
+
+      <h2>{{ _('ISBN Metadata Preview') }}</h2>
+
+      <p class="text-muted">
+        {{ _('Source') }}: {{ metadata.provider }}
+      </p>
+
+      <table class="table table-striped">
+        <tbody>
+
+          <tr>
+            <th>{{ _('Title') }}</th>
+            <td>{{ metadata.title or '-' }}</td>
+          </tr>
+
+          <tr>
+            <th>{{ _('Authors') }}</th>
+            <td>{{ metadata.authors or '-' }}</td>
+          </tr>
+
+          <tr>
+            <th>{{ _('ISBN') }}</th>
+            <td>{{ metadata.isbn or '-' }}</td>
+          </tr>
+
+          <tr>
+            <th>{{ _('Publisher') }}</th>
+            <td>{{ metadata.publisher or '-' }}</td>
+          </tr>
+
+          <tr>
+            <th>{{ _('Published') }}</th>
+            <td>{{ metadata.date or '-' }}</td>
+          </tr>
+
+          <tr>
+            <th>{{ _('Language') }}</th>
+            <td>{{ metadata.language or '-' }}</td>
+          </tr>
+
+          {% if metadata.identifiers %}
+          <tr>
+            <th>{{ _('Identifiers') }}</th>
+            <td>
+              {% for identifier in metadata.identifiers %}
+              <div>{{ identifier }}</div>
+              {% endfor %}
+            </td>
+          </tr>
+          {% endif %}
+
+          {% if metadata.description %}
+          <tr>
+            <th>{{ _('Description') }}</th>
+            <td>{{ metadata.description }}</td>
+          </tr>
+          {% endif %}
+
+        </tbody>
+      </table>
+
+      <form method="post" action="{{ url_for('edit-book.apply_isbn_metadata', book_id=book.id) }}">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <input type="hidden" name="opf_token" value="{{ opf_token }}">
+
+        <a href="{{ url_for('edit-book.show_edit_book', book_id=book.id) }}" class="btn btn-default">
+          {{ _('Cancel') }}
+        </a>
+
+        <button type="submit" class="btn btn-primary">
+          {{ _('Apply Metadata') }}
+        </button>
+
+      </form>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}

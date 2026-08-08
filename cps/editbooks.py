@@ -39,7 +39,7 @@ from .string_helper import strip_whitespaces
 from werkzeug.utils import secure_filename
 import uuid
 import subprocess
-import tempfile
+import xml.etree.ElementTree as ET
 
 editbook = Blueprint('edit-book', __name__)
 log = logger.create()
@@ -116,6 +116,7 @@ def fetch_isbn_metadata(book_id):
             continue
 
         identifier_id = key[len("identifier-type-"):]
+
         isbn = request.form.get(
             "identifier-val-{}".format(identifier_id),
             ""
@@ -133,7 +134,6 @@ def fetch_isbn_metadata(book_id):
             url_for("edit-book.show_edit_book", book_id=book_id)
         )
 
-    # Existing metadata is useful additional information for Calibre's lookup
     title = (book.title or "").strip()
 
     authors = ", ".join(
@@ -141,20 +141,6 @@ def fetch_isbn_metadata(book_id):
         for author in book.authors
         if author.name and author.name.lower() != "unknown"
     )
-
-    command = [
-        "fetch-ebook-metadata",
-        "--isbn", isbn,
-        "--allowed-plugin", "Google",
-        "--opf",
-        "--verbose",
-    ]
-
-    if title:
-        command.extend(["--title", title])
-
-    if authors:
-        command.extend(["--authors", authors])
 
     env = os.environ.copy()
     env.update({
@@ -169,9 +155,20 @@ def fetch_isbn_metadata(book_id):
     os.makedirs("/config/.cache/calibre", exist_ok=True)
     os.makedirs("/config/tmp", exist_ok=True)
 
-    opf_path = None
+    def fetch_from_provider(provider):
+        command = [
+            "fetch-ebook-metadata",
+            "--isbn", isbn,
+            "--allowed-plugin", provider,
+            "--opf",
+        ]
 
-    try:
+        if title:
+            command.extend(["--title", title])
+
+        if authors:
+            command.extend(["--authors", authors])
+
         result = subprocess.run(
             command,
             capture_output=True,
@@ -181,35 +178,166 @@ def fetch_isbn_metadata(book_id):
             check=True,
         )
 
-        # Make sure Calibre actually returned OPF metadata
         if "<package" not in result.stdout:
-            log.error(
-                "ISBN metadata lookup returned no OPF: %s",
-                result.stderr
-            )
-            flash(
-                _("No metadata found for this ISBN"),
-                category="error"
-            )
-            return redirect(
-                url_for("edit-book.show_edit_book", book_id=book_id)
+            return None
+
+        return result.stdout
+
+    opf_data = None
+    provider = None
+
+    # Google first, Open Library as fallback
+    for candidate in ["Google", "Open Library"]:
+        try:
+            opf_data = fetch_from_provider(candidate)
+
+            if opf_data:
+                provider = candidate
+                break
+
+        except subprocess.TimeoutExpired:
+            log.warning(
+                "ISBN metadata lookup timed out for provider %s",
+                candidate
             )
 
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            suffix=".opf",
-            delete=False,
-            encoding="utf-8",
-            dir="/config/tmp",
-        ) as opf_file:
-            opf_file.write(result.stdout)
-            opf_path = opf_file.name
+        except subprocess.CalledProcessError as e:
+            log.warning(
+                "ISBN metadata lookup failed for provider %s: %s",
+                candidate,
+                e.stderr
+            )
 
-        subprocess.run(
+    if not opf_data:
+        flash(
+            _("No metadata found for this ISBN"),
+            category="error"
+        )
+        return redirect(
+            url_for("edit-book.show_edit_book", book_id=book_id)
+        )
+
+    try:
+        root = ET.fromstring(opf_data)
+    except ET.ParseError as e:
+        log.error("Could not parse fetched metadata OPF: %s", e)
+        flash(
+            _("Could not parse fetched metadata"),
+            category="error"
+        )
+        return redirect(
+            url_for("edit-book.show_edit_book", book_id=book_id)
+        )
+
+    namespaces = {
+        "dc": "http://purl.org/dc/elements/1.1/",
+    }
+
+    def get_text(name):
+        element = root.find(".//dc:" + name, namespaces)
+
+        if element is None or not element.text:
+            return ""
+
+        return element.text.strip()
+
+    fetched_authors = [
+        element.text.strip()
+        for element in root.findall(".//dc:creator", namespaces)
+        if element.text
+    ]
+
+    fetched_identifiers = [
+        element.text.strip()
+        for element in root.findall(".//dc:identifier", namespaces)
+        if element.text
+    ]
+
+    metadata = {
+        "title": get_text("title"),
+        "authors": ", ".join(fetched_authors),
+        "publisher": get_text("publisher"),
+        "date": get_text("date"),
+        "language": get_text("language"),
+        "description": get_text("description"),
+        "identifiers": fetched_identifiers,
+        "isbn": isbn,
+        "provider": provider,
+    }
+
+    # Store exact OPF result until user confirms
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".opf",
+        prefix="isbn-metadata-",
+        delete=False,
+        encoding="utf-8",
+        dir="/config/tmp",
+    ) as opf_file:
+        opf_file.write(opf_data)
+        opf_token = os.path.basename(opf_file.name)
+
+    return render_template(
+        "isbn_metadata_preview.html",
+        book=book,
+        metadata=metadata,
+        opf_token=opf_token,
+    )
+
+
+@editbook.route(
+    "/admin/book/<int:book_id>/apply-isbn-metadata",
+    methods=["POST"]
+)
+@login_required_if_no_ano
+@edit_required
+def apply_isbn_metadata(book_id):
+    book = calibre_db.get_book(book_id)
+
+    if not book:
+        flash(_("Book not found"), category="error")
+        return redirect(url_for("web.index"))
+
+    opf_token = request.form.get("opf_token", "").strip()
+
+    # Only accept files created by our fetch route
+    if (
+        not opf_token
+        or os.path.basename(opf_token) != opf_token
+        or not opf_token.startswith("isbn-metadata-")
+        or not opf_token.endswith(".opf")
+    ):
+        flash(_("Invalid metadata preview"), category="error")
+        return redirect(
+            url_for("edit-book.show_edit_book", book_id=book_id)
+        )
+
+    opf_path = os.path.join("/config/tmp", opf_token)
+
+    if not os.path.isfile(opf_path):
+        flash(
+            _("Metadata preview has expired. Please fetch it again."),
+            category="error"
+        )
+        return redirect(
+            url_for("edit-book.show_edit_book", book_id=book_id)
+        )
+
+    env = os.environ.copy()
+    env.update({
+        "HOME": "/config",
+        "CALIBRE_CONFIG_DIRECTORY": "/config/.config/calibre",
+        "CALIBRE_CACHE_DIRECTORY": "/config/.cache/calibre",
+        "CALIBRE_TEMP_DIR": "/config/tmp",
+        "XDG_CACHE_HOME": "/config/.cache",
+    })
+
+    try:
+        result = subprocess.run(
             [
                 "calibredb",
-                "--library-path=/calibre-library",
                 "set_metadata",
+                "--library-path=/calibre-library",
                 str(book_id),
                 opf_path,
             ],
@@ -220,34 +348,45 @@ def fetch_isbn_metadata(book_id):
             check=True,
         )
 
+        log.info(
+            "ISBN metadata applied to book %s: %s",
+            book_id,
+            result.stdout.strip()
+        )
+
         flash(
-            _("Metadata fetched successfully"),
+            _("Metadata applied successfully"),
             category="success"
         )
 
     except subprocess.TimeoutExpired:
         log.error(
-            "ISBN metadata lookup timed out for ISBN %s",
-            isbn
+            "Applying ISBN metadata timed out for book %s",
+            book_id
         )
         flash(
-            _("Metadata lookup timed out"),
+            _("Applying metadata timed out"),
             category="error"
         )
 
     except subprocess.CalledProcessError as e:
         log.error(
-            "ISBN metadata lookup failed: %s",
-            e.stderr
+            "Applying ISBN metadata failed for book %s. stdout=%r stderr=%r",
+            book_id,
+            e.stdout,
+            e.stderr,
         )
         flash(
-            _("Failed to fetch metadata"),
+            _("Failed to apply metadata"),
             category="error"
         )
 
-    finally:
-        if opf_path and os.path.exists(opf_path):
+    else:
+        # Delete only after successful application
+        try:
             os.unlink(opf_path)
+        except OSError:
+            pass
 
     return redirect(
         url_for("edit-book.show_edit_book", book_id=book_id)
