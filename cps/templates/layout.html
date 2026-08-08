@@ -162,10 +162,10 @@
                     <a
                       id="add-placeholder"
                       href="#"
-                      data-target="#placeholderModal"
-                      title="{{ _('Add placeholder book') }}"
+                      title="{{ _('Add empty book') }}"
                       data-placement="bottom">
                       <span class="glyphicon glyphicon-plus"></span>
+                      <span class="hidden-sm">{{ _('Add empty book') }}</span>
                     </a>
                   </li>
               {% endif %}
@@ -191,7 +191,7 @@
         </div><!--/.nav-collapse -->
       </div>
     </div>
-    
+
     <div class="row-fluid text-center">
       <div id="message_library_refresh" style="display: none;" class="alert alert-info refresh-cwa">
         <p id="library_refresh_message"></p>
