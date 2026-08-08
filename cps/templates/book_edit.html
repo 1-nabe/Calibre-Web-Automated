@@ -259,7 +259,6 @@
       formaction="{{ url_for('edit-book.fetch_isbn_metadata', book_id=book.id) }}"
       formmethod="post"
       title="{{ _('Fetch metadata using ISBN') }}">
-      <span class="glyphicon glyphicon-barcode"></span>
       {{_('Fetch by ISBN')}}
     </button>
     <button type="submit" id="submit" class="btn btn-default">{{_('Save')}}</button>
