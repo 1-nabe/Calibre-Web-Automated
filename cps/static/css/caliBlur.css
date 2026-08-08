@@ -2608,6 +2608,11 @@ body > div.container-fluid > div > div.col-sm-10 > div.col-sm-8 > form > .btn.bt
     margin: 0
 }
 
+#get_meta_isbn {
+    float: left;
+    margin: 0
+}
+
 textarea {
     resize: vertical
 }

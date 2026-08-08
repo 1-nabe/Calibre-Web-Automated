@@ -145,7 +145,9 @@ def fetch_isbn_metadata(book_id):
     command = [
         "fetch-ebook-metadata",
         "--isbn", isbn,
+        "--allowed-plugin", "Google",
         "--opf",
+        "--verbose",
     ]
 
     if title:
